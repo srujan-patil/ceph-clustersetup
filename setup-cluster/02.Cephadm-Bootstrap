@@ -148,4 +148,4 @@ ssh-copy-id -f -i ~/ceph.pub root@ceph3
 
 ## What's Next
 
-Continue to [`Day-4-Add-Monitors-Managers-OSDs.md`](./Day-4-Add-Monitors-Managers-OSDs.md) to scale the cluster to all 3 nodes and add OSDs.
+Continue to [`Add-Monitors-Managers-OSDs.md`](./03.Add_Monitors_Managers_and_OSDs.md) to scale the cluster to all 3 nodes and add OSDs.
