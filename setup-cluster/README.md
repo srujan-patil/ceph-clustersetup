@@ -1,4 +1,4 @@
-# Day 2 — Prerequisites and Node Setup (3 Ubuntu Machines)
+# Prerequisites and Node Setup (3 Ubuntu Machines)
  
 Before installing Ceph with `cephadm`, we need to prep 3 Ubuntu machines so they're ready to form a cluster.
  
@@ -15,9 +15,9 @@ Before installing Ceph with `cephadm`, we need to prep 3 Ubuntu machines so they
  
 | Hostname | Role | Example IP |
 |----------|------|------------|
-| ceph1 | MON, MGR, OSD (this is the bootstrap node) | 192.168.1.11 |
-| ceph2 | MON, OSD | 192.168.1.12 |
-| ceph3 | MON, OSD | 192.168.1.13 |
+| ceph1 | MON, MGR, OSD (this is the bootstrap node) | 10.16.120.8 |
+| ceph2 | MON, OSD | 10.16.120.10 |
+| ceph3 | MON, OSD | 10.16.120.11 |
  
 > Swap in your own IPs/hostnames as needed.
  
@@ -65,9 +65,9 @@ On **every** node, add all 3 entries:
  
 ```bash
 sudo tee -a /etc/hosts <<EOF
-192.168.1.11 ceph1
-192.168.1.12 ceph2
-192.168.1.13 ceph3
+10.16.120.8 ceph1
+10.16.120.10 ceph2
+10.16.120.12 ceph3
 EOF
 ```
  
@@ -247,5 +247,5 @@ flowchart TD
  
 ## What's Next
  
-Continue to [`Day-3-Cephadm-Bootstrap.md`](./Day-3-Cephadm-Bootstrap.md) to bootstrap the Ceph cluster on `ceph1`.
+Continue to [`Cephadm-Bootstrap.md`](./) to bootstrap the Ceph cluster on `ceph1`.
  
