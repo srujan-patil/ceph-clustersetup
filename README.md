@@ -32,10 +32,13 @@ Unlike a traditional storage server, Ceph stores data across multiple servers, p
 **Traditional storage** relies on a single server, which is a single point of failure:
 
 ```mermaid
-graph TD
-    S[Storage Server] --> VM1[VM 1]
-    S --> VM2[VM 2]
-    S --> VM3[VM 3]
+flowchart LR
+    VM1(VM 1) --> S{{"Single Storage\nAppliance"}}
+    VM2(VM 2) --> S
+    VM3(VM 3) --> S
+    S -.->|"if this dies,\neverything stops"| X["❌ Outage"]
+    style S fill:#f96,stroke:#333
+    style X fill:#fdd,stroke:#900
 ```
 
 **Problems:**
@@ -48,15 +51,24 @@ graph TD
 **Ceph** distributes data across multiple nodes instead:
 
 ```mermaid
-graph TD
-    subgraph Ceph Cluster
-        C1[ceph1 - MON + OSD]
-        C2[ceph2 - MON + OSD]
-        C3[ceph3 - MON + OSD]
+flowchart TB
+    subgraph Node1["ceph1"]
+        M1["MON"]
+        O1["OSD"]
     end
-    C1 <--> C2
-    C2 <--> C3
-    C1 <--> C3
+    subgraph Node2["ceph2"]
+        M2["MON"]
+        O2["OSD"]
+    end
+    subgraph Node3["ceph3"]
+        M3["MON"]
+        O3["OSD"]
+    end
+    Pool(("Shared\nData Pool"))
+    O1 --> Pool
+    O2 --> Pool
+    O3 --> Pool
+    M1 -.-> M2 -.-> M3 -.-> M1
 ```
 
 **Advantages:**
@@ -74,14 +86,16 @@ graph TD
 A production Ceph cluster consists of multiple services:
 
 ```mermaid
-graph TD
-    Client[Client] --> Access["ceph CLI / RBD / CephFS"]
-    Access --> Monitor[Monitor - MON]
-    Access --> Manager[Manager - MGR]
-    Access --> OSDs[OSDs]
-    Monitor --- Cluster((Cluster))
-    Manager --- Cluster
-    OSDs --- Cluster
+sequenceDiagram
+    participant C as Client (ceph/RBD/CephFS)
+    participant MON as Monitor
+    participant MGR as Manager
+    participant OSD as OSD Layer
+    C->>MON: 1. Request cluster map
+    MON-->>C: 2. Return map + auth
+    C->>OSD: 3. Read/write object directly
+    MGR->>MON: (background) collect metrics
+    MGR->>OSD: (background) collect stats
 ```
 
 Each service has a specific role.
@@ -104,10 +118,10 @@ The Monitor maintains the cluster state.
 Without a healthy Monitor quorum, the cluster cannot operate normally.
 
 ```mermaid
-graph LR
-    MON1((MON1)) --- MON2((MON2))
-    MON2 --- MON3((MON3))
-    MON1 --- MON3
+flowchart TD
+    A["3 MONs deployed"] --> B{"How many alive?"}
+    B -->|"3/3 or 2/3"| Healthy["✅ Quorum OK\nCluster operational"]
+    B -->|"1/3 or 0/3"| Down["❌ Quorum lost\nCluster halts writes"]
 ```
 
 > **Rule of thumb:** with 3 MONs, at least 2 must be available to maintain quorum.
@@ -132,16 +146,20 @@ The Manager provides:
 OSDs store the actual data. Each storage disk usually corresponds to one OSD.
 
 ```mermaid
-graph TD
-    subgraph ceph1
-        D1[Disk] --> O1[OSD.0]
+flowchart LR
+    subgraph Physical Disks
+        d0["/dev/sdb"]
+        d1["/dev/sdb"]
+        d2["/dev/sdb"]
     end
-    subgraph ceph2
-        D2[Disk] --> O2[OSD.1]
+    subgraph Logical OSDs
+        o0["osd.0 (ceph1)"]
+        o1["osd.1 (ceph2)"]
+        o2["osd.2 (ceph3)"]
     end
-    subgraph ceph3
-        D3[Disk] --> O3[OSD.2]
-    end
+    d0 --> o0
+    d1 --> o1
+    d2 --> o2
 ```
 
 ### Placement Groups (PGs)
@@ -149,8 +167,13 @@ graph TD
 Ceph does not place data directly onto OSDs. Instead:
 
 ```mermaid
-graph LR
-    File --> Object --> PG[Placement Group] --> OSD
+flowchart TD
+    F["File"] -->|"split into chunks"| Obj1["Object 1"]
+    F -->|"split into chunks"| Obj2["Object 2"]
+    Obj1 -->|"CRUSH hash"| PG1["PG 1.a"]
+    Obj2 -->|"CRUSH hash"| PG2["PG 1.b"]
+    PG1 --> OSDx["osd.0 / osd.1 / osd.2"]
+    PG2 --> OSDy["osd.1 / osd.2 / osd.0"]
 ```
 
 Placement Groups help distribute and rebalance data efficiently.
@@ -175,13 +198,13 @@ No central lookup table is required — the location is computed algorithmically
 Suppose an application writes a file:
 
 ```mermaid
-graph TD
-    App[Application] --> K8s[Kubernetes]
-    K8s --> PVC[PVC]
-    PVC --> RBD[Ceph RBD]
-    RBD --> Obj[Object]
-    Obj --> CRUSH[CRUSH]
-    CRUSH --> OSDs[OSDs]
+flowchart TD
+    A(("① App writes file")) --> B["② Kubernetes intercepts I/O"]
+    B --> C["③ PVC forwards to StorageClass"]
+    C --> D["④ Ceph RBD image receives write"]
+    D --> E["⑤ Data split into objects"]
+    E --> F["⑥ CRUSH computes placement"]
+    F --> G[("⑦ Written to OSDs")]
 ```
 
 ---
@@ -191,11 +214,11 @@ graph TD
 Assume a replication size of 3:
 
 ```mermaid
-graph TD
-    Client[Client writes 1 GB] --> Object
-    Object --> Primary[Primary OSD]
-    Primary --> R1[Replica - OSD2]
-    Primary --> R2[Replica - OSD3]
+flowchart LR
+    W["Client write: 1 GB"] --> P["Primary copy\n(osd.0)"]
+    P ==>|"sync replicate"| R1["Copy 2\n(osd.1)"]
+    P ==>|"sync replicate"| R2["Copy 3\n(osd.2)"]
+    P --- Total["Total raw usage: 3 GB"]
 ```
 
 **Example:**
@@ -257,4 +280,4 @@ In this guide, we'll configure:
 
 ## What's Next
 
-Continue to [day2-cluster-setup/`](../day2-cluster-setup/) to begin preparing the 3 Ubuntu machines for the Ceph cluster.
+Continue to [`day2-cluster-setup/`](../day2-cluster-setup/) to begin preparing the 3 Ubuntu machines for the Ceph cluster.
