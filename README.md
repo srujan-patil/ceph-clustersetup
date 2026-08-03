@@ -280,4 +280,4 @@ In this guide, we'll configure:
 
 ## What's Next
 
-Continue to [`day2-cluster-setup/`](../day2-cluster-setup/) to begin preparing the 3 Ubuntu machines for the Ceph cluster.
+Continue to [`cluster-setup`](../setup-cluster/) to begin preparing the 3 Ubuntu machines for the Ceph cluster.
